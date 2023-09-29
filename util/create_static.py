@@ -3,7 +3,7 @@
 #--------------------------------------------------------------------------------#
 # Read geotiff files and convert to PALM static file
 # 
-# @author: Dongqi Lin, Jiawei Zhang
+# @author: Dongqi Lin, Jiawei Zhang, Eva Bendix Nielsen
 #--------------------------------------------------------------------------------#
 import warnings
 warnings.filterwarnings("ignore")
@@ -126,6 +126,16 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
     sfch_tif = dem_tif.replace("DEM","SFCH")
     pavement_tif = dem_tif.replace("DEM","pavement")
     street_tif = dem_tif.replace("DEM","street")
+    
+    lai_tif = dem_tif.replace("DEM","LAI")
+    vegetation_type_tif = dem_tif.replace("DEM","vegetation_type")
+    vegetation_height_tif = dem_tif.replace("DEM","vegetation_height")
+    single_tree_height_tif = dem_tif.replace("DEM","tree_height")
+    tree_crown_diameter_tif =  dem_tif.replace("DEM","tree_crown_diameter")
+    tree_trunk_diameter_tif =  dem_tif.replace("DEM","tree_trunk_diameter")
+    #tree_type_tif =  dem_tif.replace("DEM","tree_height")
+     
+    
 
     # Read topography file
     dem, lat, lon = readgeotiff(dem_tif)
@@ -226,7 +236,81 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
         pavement_type[:,:] = -9999
     pavement_type[water_type>0] = -9999
     
+    
+    
+    #Vegetation properties 
+    print('Reading LAI')
+    if not os.path.exists(lai_tif):
+        LAI = np.zeros_like(zt)
+        LAI[:] = np.nan
+    else:
+        LAI_geo, lat, lon = readgeotiff(lai_tif)
+        LAI= extract_tiff(LAI_geo, lat, lon, dom_dict, tif_left,tif_south,tif_north,config_proj,case_name, idomain)
+        del LAI_geo, lat, lon
+        gc.collect()
+    
+    
+    
+    print('Reading vegetation_type')
+    if not os.path.exists(vegetation_type_tif):
+        vegetation_type = np.zeros_like(zt)
+        vegetation_type[:] = np.nan
+    else:
+        vegetation_type_geo, lat, lon = readgeotiff(vegetation_type_tif)
+        vegetation_type = extract_tiff(vegetation_type_geo, lat, lon, dom_dict, tif_left,tif_south,tif_north,config_proj,case_name, idomain)
+        del vegetation_type_geo, lat, lon
+        gc.collect()
 
+        
+    print('Reading vegetation_height')
+    if not os.path.exists(vegetation_height_tif):
+        vegetation_height = np.zeros_like(zt)
+        vegetation_height[:] = np.nan
+    else:
+        vegetation_height_geo, lat, lon = readgeotiff(vegetation_height_tif)
+        vegetation_height = extract_tiff(vegetation_height_geo, lat, lon, dom_dict, tif_left,tif_south,tif_north,config_proj,case_name, idomain)
+        vegetation_height[vegetation_height == NaN] = 0 
+        del vegetation_height_geo, lat, lon
+        gc.collect()
+        
+        
+    print('Reading single tree_height') # maximum height of tree 
+    if not os.path.exists(tree_height_tif):
+        single_tree_height = np.zeros_like(zt)
+        single_tree_height[:] = np.nan
+    else:
+        single_tree_height_geo, lat, lon = readgeotiff(single_tree_height_tif)
+        single_tree_height = extract_tiff(single_tree_height_geo, lat, lon, dom_dict, tif_left,tif_south,tif_north,config_proj,case_name, idomain)
+        del single_tree_height_geo, lat, lon
+        gc.collect()
+        
+        
+
+    print('Reading tree_crown_diameter')
+    if not os.path.exists(tree_crown_diameter_tif):
+        tree_crown_diameter = np.zeros_like(zt)
+        tree_crown_diameter[:] = np.nan
+    else:
+        tree_crown_diameter_geo, lat, lon = readgeotiff(tree_crown_diameter_tif)
+        tree_crown_diameter = extract_tiff(tree_crown_diameter_geo, lat, lon, dom_dict, tif_left,tif_south,tif_north,config_proj,case_name, idomain)
+        del tree_crown_diameter_geo, lat, lon
+        gc.collect()
+        
+
+        
+    print('Reading tree_trunk_diameter')
+    if not os.path.exists(tree_crown_diameter_tif):
+        tree_trunk_diameter = np.zeros_like(zt)
+        tree_trunk_diameter[:] = np.nan
+    else:
+        tree_trunk_diameter_geo, lat, lon = readgeotiff(tree_trunk_diameter_tif)
+        tree_trunk_diameter = extract_tiff(tree_trunk_diameter_geo, lat, lon, dom_dict, tif_left,tif_south,tif_north,config_proj,case_name, idomain)
+        del tree_trunk_diameter_geo, lat, lon
+        gc.collect()        
+        
+        
+        
+        
     
     # process street
     street_type =  np.array([[cell if cell>0 else -9999 for cell in row] for row in street])
@@ -251,7 +335,7 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
         buildings_3d, zbld = make_3d_from_2d(building_height, x, y, dz)
     
     # process vegetation
-    vegetation_type = lu2palm(lu, 'vegetation')
+    #vegetation_type = lu2palm(lu, 'vegetation')      # we input vegetation type make if statement!!! 
     vegetation_type[water_type>0] = -9999
     vegetation_type[pavement_type>0] = -9999
     vegetation_type[building_type>0] = -9999
@@ -291,11 +375,20 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
                 soil_type[idy, idx] = 3
                 
     # if surface height input is provided
-    # calculate leaf area density (LAD)
+    # calculate leaf area density (LAD) 
+    
+    #### UPDATE HERE ####
+    #if os.path.exists(lai_tif):
+    # need to adding here LAI and LAD use
+    #else if os.path.exists(sfch_tif):
+    
+    
+    
     if os.path.exists(sfch_tif):
     # process lad
     # remove cars and some other "noise"
-        tree_height = np.copy(sfch_tmp)
+        #tree_height = np.copy(sfch_tmp)   #tree height changed to DSM
+        tree_height = vegetation_height
         tree_height[tree_height<=1.5] = -9999
     # remove single points in the domain
         n_thresh = 1
@@ -363,6 +456,14 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
     water_type[water_type == -9999.0] = -127.0
     soil_type[soil_type == -9999.0] = -127.0
     soil_type[soil_type == 0] = -127.0
+    
+    vegetation_height[vegetation_height == -9999.0] = -127.0
+    vegetation_height[building_type>0 == -9999.0] = -127.0
+    
+    single_tree_height[single_tree_height == -9999.0] = -127.0
+    tree_crown_diameter[tree_crown_diameter == -9999.0] = -127.0
+    tree_trunk_diameter[tree_trunk_diameter == -9999.0] = -127.0
+
     
     # calculate albedo type for vegetation, pavements, buildings, water
     albedo_type = np.zeros_like(vegetation_type)
@@ -456,7 +557,19 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
     nc_surface_fraction = nc_output.createVariable('surface_fraction', np.float32, ('nsurface_fraction', 'y', 'x'), fill_value=-9999.0, zlib=True)     
     nc_output.createDimension('nwater_pars', 7)
     nc_nwater_pars = nc_output.createVariable('nwater_pars', np.int32, 'nwater_pars')
-    nc_water_pars = nc_output.createVariable('water_pars', np.float32, ('nwater_pars', 'y', 'x'), fill_value=-9999.0, zlib=True)     
+    nc_water_pars = nc_output.createVariable('water_pars', np.float32, ('nwater_pars', 'y', 'x'), fill_value=-9999.0, zlib=True)
+    
+    # plant 
+    nc_lai = nc_output.createVariable('vegetation_height', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_vegetation_type = nc_output.createVariable('vegetation_type', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_vegetation_height = nc_output.createVariable('vegetation_height', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_tree_crown_diameter = nc_output.createVariable('tree_crown_diameter', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_tree_height = nc_output.createVariable('tree_height', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_tree_trunk_diameter = nc_output.createVariable('trunk_diameter', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    #tree_type = nc_output.createVariable('tree_type', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_patch_height = nc_output.createVariable('patch_height', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    nc_patch_type = nc_output.createVariable('patch_type', np.byte, ('y', 'x'), fill_value=np.byte(-127), zlib=True)
+    
 
     nc_vegetation.long_name = 'vegetation_type_classification'
     nc_vegetation.units = ''
@@ -538,6 +651,30 @@ def generate_palm_static(case_name, tmp_path, idomain, config_proj, dom_dict):
         nc_buildings_2d[:] = building_height
         nc_building_id[:] = building_id
         nc_buildings_3d[:] = buildings_3d
+        
+        
+    
+    
+    #Vegetation properties 
+    #if os.path.exists(lai_tif):
+        
+    
+ 
+    #if os.path.exists(vegetation_type_tif):
+    
+    
+    #if os.path.exists(vegetation_height_tif):    
+        
+ 
+    #if os.path.exists(tree_height_tif):
+        
+
+    #if os.path.exists(tree_crown_diameter_tif):        
+
+    #if os.path.exists(tree_crown_diameter_tif):
+        
+            
+    
 
     nc_output.close()
 
